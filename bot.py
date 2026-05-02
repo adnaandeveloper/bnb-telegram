@@ -6,9 +6,17 @@ import time
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Henter fra Railway Variables – ingen.env nødvendig
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
+# ===== RAILWAY VARIABLES =====
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+
+if not TOKEN:
+    raise RuntimeError("❌ TELEGRAM_BOT_TOKEN mangler i Railway Variables!")
+if not ADMIN_CHAT_ID:
+    raise RuntimeError("❌ ADMIN_CHAT_ID mangler i Railway Variables!")
+
+print(f"Token loaded: {TOKEN[:10]}... Chat ID: {ADMIN_CHAT_ID}")
+# =============================
 
 # ===== BALANCERET FILTER =====
 MIN_AGE_MIN = 5
@@ -53,8 +61,7 @@ def fetch_new_bnb():
 
         for prof in bnb:
             addr = prof.get("tokenAddress")
-            if not addr or addr in seen:
-                continue
+            if not addr or addr in seen: continue
 
             pair_data = requests.get(f"https://api.dexscreener.com/latest/dex/tokens/{addr}", timeout=10).json()
             pairs = pair_data.get("pairs", [])
