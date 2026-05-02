@@ -1,22 +1,25 @@
-import os, requests, asyncio, json, time
+import os
+import requests
+import asyncio
+import json
+import time
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from dotenv import load_dotenv
 
-load_dotenv()
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+# Henter fra Railway Variables – ingen.env nødvendig
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
 # ===== BALANCERET FILTER =====
-MIN_AGE_MIN = 5 # mindst 5 minutter gammel (undgå fake launch)
-MAX_AGE_HOURS = 3 # max 3 timer
-MIN_LIQ = 8000 # $8k
-MAX_LIQ = 150000 # $150k
-MIN_VOL_24H = 3000 # $3k volumen
+MIN_AGE_MIN = 5
+MAX_AGE_HOURS = 3
+MIN_LIQ = 8000
+MAX_LIQ = 150000
+MIN_VOL_24H = 3000
 MIN_BUYS_H1 = 10
-BUY_SELL_RATIO = 1.3 # buys skal være 30% højere end sells
-MAX_PRICECHANGE_H1 = 200 # <200% på 1 time
-MAX_FDV = 500000 # < $500k
+BUY_SELL_RATIO = 1.3
+MAX_PRICECHANGE_H1 = 200
+MAX_FDV = 500000
 # =============================
 
 SEEN_FILE = "seen_tokens.json"
@@ -43,10 +46,8 @@ def goplus_check(address):
 
 def fetch_new_bnb():
     try:
-        # Hent de nyeste token profiler
         profiles = requests.get("https://api.dexscreener.com/token-profiles/latest/v1", timeout=15).json()
         bnb = [p for p in profiles if p.get("chainId") == "bsc"][:30]
-
         hits = []
         now = time.time() * 1000
 
@@ -55,7 +56,6 @@ def fetch_new_bnb():
             if not addr or addr in seen:
                 continue
 
-            # Hent pair data
             pair_data = requests.get(f"https://api.dexscreener.com/latest/dex/tokens/{addr}", timeout=10).json()
             pairs = pair_data.get("pairs", [])
             if not pairs: continue
@@ -63,10 +63,7 @@ def fetch_new_bnb():
 
             created = p.get("pairCreatedAt", 0)
             age_hours = (now - created) / 3600000 if created else 999
-            age_min = age_hours * 60
-
-            if not (MIN_AGE_MIN/60 <= age_hours <= MAX_AGE_HOURS):
-                continue
+            if not (MIN_AGE_MIN/60 <= age_hours <= MAX_AGE_HOURS): continue
 
             liq = p.get("liquidity", {}).get("usd", 0) or 0
             if not (MIN_LIQ <= liq <= MAX_LIQ): continue
@@ -85,7 +82,6 @@ def fetch_new_bnb():
             fdv = p.get("fdv", 0) or 0
             if fdv > MAX_FDV: continue
 
-            # GoPlus sikkerhedstjek
             safe, reason = goplus_check(addr)
             if not safe: continue
 
@@ -96,7 +92,7 @@ def fetch_new_bnb():
                 "url": p.get("url"),
                 "liq": int(liq),
                 "vol": int(vol),
-                "age_min": int(age_min),
+                "age_min": int(age_hours*60),
                 "buys": buys,
                 "sells": sells,
                 "fdv": int(fdv)
@@ -139,10 +135,8 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", id_cmd))
-
     async def on_startup(app): asyncio.create_task(monitor(app))
     app.post_init = on_startup
-
     print("Bot kører...")
     app.run_polling()
 
