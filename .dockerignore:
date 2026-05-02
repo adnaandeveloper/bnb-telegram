@@ -1,0 +1,6 @@
+__pycache__/
+.git
+.env
+venv/
+seen_tokens.json
+*.pyc
